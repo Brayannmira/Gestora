@@ -23,16 +23,22 @@ export async function startApiTestServer() {
     import('./mailer.js'),
   ])
   const { db } = database
+  const { defaultOrganizationId } = database
   let otpCode
+  const accessTokens = new Map()
   mailer.setOtpSenderForTest((_email, code) => { otpCode = code })
+  mailer.setNotificationSenderForTest((email, subject, token) => {
+    if (subject !== 'Prueba de correo de Gestora') accessTokens.set(email, token)
+  })
   db.prepare(`
-    INSERT INTO users (id, email, name, password_hash, role, created_at)
-    VALUES (?, ?, ?, ?, 'SUPER_ADMIN', ?)
+    INSERT INTO users (id, email, name, password_hash, role, organization_id, created_at)
+    VALUES (?, ?, ?, ?, 'SUPER_ADMIN', ?, ?)
   `).run(
     'super-1',
     'owner@example.test',
     'Owner',
     await security.hashPassword('correct-horse-battery'),
+    defaultOrganizationId,
     new Date().toISOString(),
   )
 
@@ -58,6 +64,50 @@ export async function startApiTestServer() {
     })
     const payload = response.status === 204 ? null : await response.json()
     return { response, payload }
+  }
+
+  async function sendWithLegacyUserFixture(pathname, options = {}) {
+    if (pathname !== '/api/users' || options.method !== 'POST') {
+      return send(pathname, options)
+    }
+    const { usersService } = await import('./container.js')
+    const { authRepository } = await import('./container.js')
+    const { hashSessionToken } = security
+    const token = options.cookie?.split('=')[1]
+    const actor = token
+      ? authRepository.findActiveSession(hashSessionToken(token), Date.now())
+      : null
+    if (!actor) {
+      return { response: { status: 401 }, payload: { error: 'Inicia sesión para continuar.' } }
+    }
+    try {
+      const user = await usersService.createAccount({
+        ...options.body,
+        actor,
+      })
+      const roleKey = {
+        EMPLOYEE: 'employee',
+        ADMIN: 'admin',
+        SUPER_ADMIN: 'super-admin',
+      }[user.role]
+      return {
+        response: { status: 201 },
+        payload: {
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            roleKey,
+            mustChangePassword: Boolean(user.must_change_password),
+          },
+        },
+      }
+    } catch (error) {
+      return {
+        response: { status: error.status ?? 500 },
+        payload: { error: error.message },
+      }
+    }
   }
 
   async function loginAndVerify(email, password) {
@@ -89,11 +139,15 @@ export async function startApiTestServer() {
     get otpCode() {
       return otpCode
     },
-    send,
+    send: sendWithLegacyUserFixture,
+    invitationToken(email) {
+      return accessTokens.get(email)
+    },
     loginAndVerify,
     superAdminSession,
     async close() {
       mailer.setOtpSenderForTest(null)
+      mailer.setNotificationSenderForTest(null)
       await new Promise((resolve) => server.close(resolve))
       db.close()
       await rm(directory, { recursive: true, force: true })

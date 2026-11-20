@@ -34,6 +34,13 @@ const requiredColumns = {
     'created_at',
   ],
 }
+const tenantColumns = {
+  users: ['organization_id'],
+  products: ['organization_id'],
+  requests: ['organization_id'],
+  inventory_movements: ['organization_id'],
+  audit_events: ['organization_id'],
+}
 
 export function assertDatabaseIntegrity(database) {
   const result = database.prepare('PRAGMA integrity_check').get()
@@ -47,6 +54,33 @@ export function assertDatabaseIntegrity(database) {
     )
     if (!columns.every((column) => tableColumns.has(column))) {
       throw new Error('El archivo no tiene el esquema de base de datos esperado por Gestora.')
+    }
+  }
+
+  const organizationsTableExists = Boolean(database.prepare(`
+    SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'organizations'
+  `).get())
+  const anyTenantColumnExists = Object.keys(tenantColumns).some((table) => (
+    database.prepare(`PRAGMA table_info(${table})`).all()
+      .some((column) => column.name === 'organization_id')
+  ))
+  if (organizationsTableExists || anyTenantColumnExists) {
+    if (!organizationsTableExists) {
+      throw new Error('El respaldo tiene un esquema multiempresa incompleto.')
+    }
+    const organizationTableColumns = new Set(
+      database.prepare('PRAGMA table_info(organizations)').all().map((column) => column.name),
+    )
+    if (!['id', 'name', 'created_at'].every((column) => organizationTableColumns.has(column))) {
+      throw new Error('El respaldo tiene un esquema multiempresa incompleto.')
+    }
+    for (const [table, columns] of Object.entries(tenantColumns)) {
+      const tableColumns = new Set(
+        database.prepare(`PRAGMA table_info(${table})`).all().map((column) => column.name),
+      )
+      if (!columns.every((column) => tableColumns.has(column))) {
+        throw new Error('El respaldo tiene un esquema multiempresa incompleto.')
+      }
     }
   }
 

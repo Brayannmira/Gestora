@@ -1,6 +1,7 @@
 import {
   ClipboardList,
   BarChart3,
+  Bell,
   KeyRound,
   LayoutDashboard,
   Package,
@@ -10,6 +11,7 @@ import {
 export const NAV_BY_ROLE = {
   EMPLOYEE: [
     { id: 'overview', label: 'Resumen', icon: LayoutDashboard },
+    { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
     {
       id: 'solicitudes',
       label: 'Solicitudes',
@@ -19,6 +21,7 @@ export const NAV_BY_ROLE = {
   ],
   ADMIN: [
     { id: 'overview', label: 'Resumen', icon: LayoutDashboard },
+    { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
     {
       id: 'solicitudes',
       label: 'Solicitudes',
@@ -27,9 +30,11 @@ export const NAV_BY_ROLE = {
     },
     { id: 'inventario', label: 'Inventario', icon: Package },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
+    { id: 'auditoria', label: 'Auditoría', icon: KeyRound },
   ],
   SUPER_ADMIN: [
     { id: 'overview', label: 'Control global', icon: LayoutDashboard },
+    { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
     {
       id: 'solicitudes',
       label: 'Solicitudes',
@@ -39,7 +44,7 @@ export const NAV_BY_ROLE = {
     { id: 'inventario', label: 'Inventario', icon: Package },
     { id: 'reportes', label: 'Reportes', icon: BarChart3 },
     { id: 'usuarios', label: 'Usuarios', icon: Users },
-    { id: 'auditoria', label: 'Auditoría OTP/Token', icon: KeyRound },
+    { id: 'auditoria', label: 'Auditoría', icon: KeyRound },
   ],
 }
 

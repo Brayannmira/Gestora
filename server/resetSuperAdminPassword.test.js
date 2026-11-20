@@ -12,13 +12,15 @@ describe('restablecimiento de contraseña del superadministrador', () => {
         id TEXT PRIMARY KEY,
         email TEXT NOT NULL,
         role TEXT NOT NULL,
+        organization_id TEXT NOT NULL,
         is_active INTEGER NOT NULL,
         password_hash TEXT NOT NULL,
         must_change_password INTEGER NOT NULL DEFAULT 0
       );
       CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL);
       CREATE TABLE otp_challenges (id TEXT PRIMARY KEY, user_id TEXT NOT NULL);
-      INSERT INTO users VALUES ('admin-1', 'admin@example.test', 'SUPER_ADMIN', 1, 'old-hash', 1);
+      INSERT INTO users VALUES
+        ('admin-1', 'admin@example.test', 'SUPER_ADMIN', 'default-organization', 1, 'old-hash', 1);
       INSERT INTO sessions VALUES ('session-1', 'admin-1');
       INSERT INTO otp_challenges VALUES ('otp-1', 'admin-1');
     `)
@@ -35,6 +37,7 @@ describe('restablecimiento de contraseña del superadministrador', () => {
     const result = await resetSuperAdminPassword({
       database,
       password: 'a-new-secret-123',
+      organizationId: 'default-organization',
       hashPassword: async (password) => `hashed:${password}`,
     })
 
@@ -51,6 +54,7 @@ describe('restablecimiento de contraseña del superadministrador', () => {
     await expect(resetSuperAdminPassword({
       database,
       password: 'too-short',
+      organizationId: 'default-organization',
       hashPassword: async (password) => `hashed:${password}`,
     })).rejects.toThrow('12 y 256')
 
@@ -64,6 +68,7 @@ describe('restablecimiento de contraseña del superadministrador', () => {
     await expect(resetSuperAdminPassword({
       database,
       password: 'a-new-secret-123',
+      organizationId: 'default-organization',
       hashPassword: async (password) => `hashed:${password}`,
     })).rejects.toThrow('No se encontró una cuenta activa')
   })

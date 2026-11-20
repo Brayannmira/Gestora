@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import { StringDecoder } from 'node:string_decoder'
-import { db } from './database.js'
+import { db, defaultOrganizationId } from './database.js'
 import { hashPassword } from './security.js'
 import { resetSuperAdminPassword } from './resetSuperAdminPassword.js'
 
@@ -73,6 +73,8 @@ async function main() {
       database: db,
       password,
       hashPassword,
+      organizationId: process.env.RESET_SUPER_ADMIN_ORGANIZATION_ID || defaultOrganizationId,
+      email: process.env.RESET_SUPER_ADMIN_EMAIL,
     })
     process.stderr.write(
       `Contraseña restablecida para ${maskEmail(account.email)}. Se cerraron las sesiones anteriores.\n`,

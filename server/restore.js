@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, realpathSync, renameSync, rmSync } from 'node:fs'
+import { chmodSync, existsSync, realpathSync, renameSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
@@ -43,6 +43,7 @@ export async function restoreBackup(sourcePath, { renameFile = renameSync } = {}
     renameFile(databasePath, originalPath)
     originalMoved = true
     renameFile(temporaryPath, databasePath)
+    if (process.platform !== 'win32') chmodSync(databasePath, 0o600)
     const restored = new DatabaseSync(databasePath, { readOnly: true })
     try {
       assertDatabaseIntegrity(restored)

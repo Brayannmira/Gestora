@@ -1,5 +1,6 @@
 import { HttpError } from '../shared/errors.js'
 import { isInteger, isUuid } from '../shared/validation.js'
+import { enforcePlanLimit } from '../plans.js'
 
 const priorities = ['urgente', 'importante', 'normal']
 const statuses = ['pendiente', 'en-proceso', 'completada', 'cancelada']
@@ -7,10 +8,13 @@ const statuses = ['pendiente', 'en-proceso', 'completada', 'cancelada']
 export function createMigrationService({
   repository,
   inventory,
+  organizations,
   transaction,
+  audit,
   now = () => new Date().toISOString(),
 }) {
-  function importLocal({ products, requests, actorId }) {
+  function importLocal({ products, requests, actor }) {
+    const actorId = actor.id
     if (
       !Array.isArray(products) ||
       !Array.isArray(requests) ||
@@ -21,9 +25,18 @@ export function createMigrationService({
     }
 
     transaction(() => {
-      if (repository.hasProductsOrRequests()) {
+      if (repository.hasProductsOrRequests(actor.organization_id)) {
         throw new HttpError(409, 'La importación solo se permite cuando la base de datos está vacía.')
       }
+      const subscription = organizations.getSubscription(actor.organization_id)
+      if (!subscription || ['expired', 'suspended'].includes(subscription.status)) {
+        throw new HttpError(403, 'El plan de esta empresa no permite importar productos.')
+      }
+      enforcePlanLimit({
+        planKey: subscription.plan_key,
+        resource: 'products',
+        count: products.length,
+      })
 
       const productsById = new Map()
       for (const product of products) {
@@ -45,11 +58,15 @@ export function createMigrationService({
           name: product.name.trim().slice(0, 100),
           stock: product.stock,
           minimumStock: product.minimumStock,
+          branch_id: inventory.findDefaultBranchId(actor.organization_id),
+          barcode: null,
         }
         productsById.set(product.id, normalizedProduct)
         repository.insertImportedProduct({
           ...normalizedProduct,
           createdBy: actorId,
+          organizationId: actor.organization_id,
+          branchId: normalizedProduct.branch_id,
           createdAt: now(),
         })
         if (product.stock > 0) {
@@ -61,6 +78,7 @@ export function createMigrationService({
             newStock: product.stock,
             reason: 'Saldo importado del navegador; historial previo no disponible.',
             actorId,
+            organizationId: actor.organization_id,
           })
         }
       }
@@ -91,9 +109,20 @@ export function createMigrationService({
           quantity: item.quantity,
           stockDeducted,
           createdBy: actorId,
+          organizationId: actor.organization_id,
+          branchId: product.branch_id,
           createdAt: now(),
         })
       }
+      audit.record({
+        actor,
+        action: 'data.legacy_imported',
+        entityType: 'migration',
+        details: {
+          importedProducts: products.length,
+          importedRequests: requests.length,
+        },
+      })
     })
 
     return {

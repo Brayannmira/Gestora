@@ -35,13 +35,20 @@ describe('copias de seguridad y restauración SQLite', () => {
     createBackup = backupModule.createBackup
     restoreBackup = restoreModule.restoreBackup
     database.prepare(`
-      INSERT INTO users (id, email, name, password_hash, role, created_at)
-      VALUES ('backup-user', 'backup@example.test', 'Backup User', 'test-hash', 'SUPER_ADMIN', ?)
-    `).run(new Date().toISOString())
+      INSERT INTO users
+        (id, email, name, password_hash, role, organization_id, created_at)
+      VALUES ('backup-user', 'backup@example.test', 'Backup User', 'test-hash', 'SUPER_ADMIN', ?, ?)
+    `).run(databaseModule.defaultOrganizationId, new Date().toISOString())
     database.prepare(`
-      INSERT INTO products (id, name, stock, minimum_stock, created_by, created_at)
-      VALUES ('backup-product', 'Producto guardado', 7, 2, 'backup-user', ?)
-    `).run(new Date().toISOString())
+      INSERT INTO products
+        (id, name, stock, minimum_stock, organization_id, branch_id, created_by, created_at)
+      VALUES ('backup-product', 'Producto guardado', 7, 2, ?, ?, 'backup-user', ?)
+    `).run(
+      databaseModule.defaultOrganizationId,
+      database.prepare('SELECT id FROM branches WHERE organization_id = ?')
+        .get(databaseModule.defaultOrganizationId).id,
+      new Date().toISOString(),
+    )
   })
 
   afterEach(async () => {

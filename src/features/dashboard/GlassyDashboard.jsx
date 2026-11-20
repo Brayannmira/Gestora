@@ -1,22 +1,35 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { Suspense } from 'react'
 import {
   AlertTriangle,
   ClipboardCheck,
   ClipboardList,
   PackageCheck,
+  PackageSearch,
 } from 'lucide-react'
 import { getDashboardRole, KPI_BY_ROLE } from './dashboardConfig.js'
 import SidebarGlass from './SidebarGlass.jsx'
 import StatCardGlass from './StatCardGlass.jsx'
 import TopbarGlass from './TopbarGlass.jsx'
+import PlanOverviewCard from './PlanOverviewCard.jsx'
+import {
+  INVENTORY_FILTERS_KEY,
+  readSessionPreference,
+  REQUEST_FILTERS_KEY,
+  writeSessionPreference,
+} from '../../sessionPreferences.js'
 import '../../styles/glassTheme.css'
 
 function GlassyDashboard({
   user,
-  requests,
+  requestSummary = { total: 0, open: 0, completed: 0, urgent: 0, awaitingApproval: 0 },
+  requestSearchResults = [],
+  requestSearchStatus = 'idle',
+  requestSearchError = '',
   products,
   activeTab,
   onTabChange,
+  onTabIntent,
   onLogout,
   onNewRequest,
   searchQuery = '',
@@ -28,6 +41,11 @@ function GlassyDashboard({
   dataError,
   hasLoadedData,
   onRetryData,
+  subscription,
+  subscriptionStatus,
+  subscriptionError,
+  onRetrySubscription,
+  onViewPlan,
   legacyImport,
   onImportLegacy,
   onDiscardLegacy,
@@ -35,21 +53,14 @@ function GlassyDashboard({
 }) {
   const prefersReducedMotion = useReducedMotion()
   const dashboardRole = getDashboardRole(user.roleKey)
-  const openRequests = requests.filter(
-    (request) => request.status !== 'completada' && request.status !== 'cancelada',
-  ).length
-  const completedRequests = requests.filter(
-    (request) => request.status === 'completada',
-  ).length
-  const requestProgress = requests.length === 0
+  const totalRequests = requestSummary.total
+  const openRequests = requestSummary.open
+  const awaitingApproval = requestSummary.awaitingApproval ?? 0
+  const completedRequests = requestSummary.completed
+  const urgentRequests = requestSummary.urgent
+  const requestProgress = totalRequests === 0
     ? 0
-    : Math.round((completedRequests / requests.length) * 100)
-  const urgentRequests = requests.filter(
-    (request) =>
-      request.priority === 'urgente' &&
-      request.status !== 'completada' &&
-      request.status !== 'cancelada',
-  ).length
+    : Math.round((completedRequests / totalRequests) * 100)
   const lowStockProducts = products.filter(
     (product) => product.stock <= product.minimumStock,
   ).length
@@ -57,7 +68,7 @@ function GlassyDashboard({
   const statsByKey = {
     totalRequests: {
       title: 'Solicitudes totales',
-      value: requests.length,
+      value: totalRequests,
       detail: 'En la base de datos',
       icon: ClipboardList,
     },
@@ -87,23 +98,12 @@ function GlassyDashboard({
     },
   }
   const stats = KPI_BY_ROLE[dashboardRole].map((key) => statsByKey[key])
+  const showPlanOverview = dashboardRole === 'SUPER_ADMIN'
 
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
   const searchResults = normalizedSearch
     ? [
-      ...requests
-        .filter((request) =>
-          `${request.title} ${request.description}`
-            .toLocaleLowerCase()
-            .includes(normalizedSearch),
-        )
-        .map((request) => ({
-          id: request.id,
-          kind: 'request',
-          title: request.title,
-          subtitle: `Solicitud · ${request.status.replace('-', ' ')}`,
-          page: 'solicitudes',
-        })),
+      ...requestSearchResults,
       ...(dashboardRole === 'EMPLOYEE'
         ? []
         : products
@@ -127,42 +127,92 @@ function GlassyDashboard({
           <div>
             <p className="overview-eyebrow">RESUMEN DE OPERACIONES</p>
             <h2 id="overview-title">Tu espacio, de un vistazo</h2>
-            <p>Indicadores calculados con las solicitudes y productos actuales.</p>
+            <p>
+              {hasLoadedData
+                ? 'Indicadores calculados con las solicitudes y productos actuales.'
+                : 'Consulta el estado y los límites de tu empresa.'}
+            </p>
           </div>
           <span className="overview-date">Base de datos SQLite</span>
         </div>
 
-        <div className="bento-grid">
-          {stats.map((stat, index) => (
-            <StatCardGlass key={stat.title} {...stat} index={index} />
-          ))}
-        </div>
+        {showPlanOverview && (
+          <PlanOverviewCard
+            error={subscriptionError}
+            onRetry={onRetrySubscription}
+            onViewPlan={onViewPlan}
+            status={subscriptionStatus}
+            subscription={subscription}
+          />
+        )}
 
-        <div className="overview-note glass-panel">
-          <span className="overview-note-icon" aria-hidden="true">i</span>
-          <p>
-            Solicitudes, productos y movimientos se guardan en SQLite. Las
-            contraseñas se almacenan con hash y la sesión usa una cookie HttpOnly.
-          </p>
-        </div>
+        {hasLoadedData && (
+          <>
+            <div className="bento-grid">
+              {stats.map((stat, index) => (
+                <StatCardGlass key={stat.title} {...stat} index={index} />
+              ))}
+            </div>
+            {(awaitingApproval > 0 || (dashboardRole !== 'EMPLOYEE' && lowStockProducts > 0)) && (
+              <nav className="overview-quick-actions" aria-label="Accesos rápidos">
+                {awaitingApproval > 0 && (
+                  <button
+                    className="overview-quick-action"
+                    type="button"
+                    onClick={() => {
+                      writeSessionPreference(REQUEST_FILTERS_KEY, {
+                        ...readSessionPreference(REQUEST_FILTERS_KEY, {}),
+                        statusFilter: 'todas',
+                        approvalFilter: 'pendiente',
+                        priorityFilter: 'todas',
+                        quickFilter: null,
+                        listSearch: '',
+                        dateFrom: '',
+                        dateTo: '',
+                        page: 1,
+                      })
+                      onSearchChange('')
+                      onTabChange('solicitudes')
+                    }}
+                  >
+                    <ClipboardCheck aria-hidden="true" size={17} />
+                    <span>Ver solicitudes pendientes de aprobación</span>
+                    <strong>{awaitingApproval}</strong>
+                  </button>
+                )}
+                {dashboardRole !== 'EMPLOYEE' && lowStockProducts > 0 && (
+                  <button
+                    className="overview-quick-action"
+                    type="button"
+                    onClick={() => {
+                      writeSessionPreference(INVENTORY_FILTERS_KEY, {
+                        ...readSessionPreference(INVENTORY_FILTERS_KEY, {}),
+                        lowStockOnly: true,
+                        barcodeSearch: '',
+                      })
+                      onSearchChange('')
+                      onTabChange('inventario')
+                    }}
+                  >
+                    <PackageSearch aria-hidden="true" size={17} />
+                    <span>Revisar productos con stock bajo</span>
+                    <strong>{lowStockProducts}</strong>
+                  </button>
+                )}
+              </nav>
+            )}
+            <div className="overview-note glass-panel">
+              <span className="overview-note-icon" aria-hidden="true">i</span>
+              <p>
+                Solicitudes, productos y movimientos se guardan en SQLite. Las
+                contraseñas se almacenan con hash y la sesión usa una cookie HttpOnly.
+              </p>
+            </div>
+          </>
+        )}
       </section>
     )
-    : activeTab === 'auditoria'
-      ? (
-        <section className="audit-placeholder glass-panel" aria-labelledby="audit-title">
-          <span className="audit-icon" aria-hidden="true">
-            <AlertTriangle size={22} />
-          </span>
-          <p className="overview-eyebrow">SOLO SUPERADMINISTRADOR</p>
-          <h2 id="audit-title">Auditoría OTP/Token</h2>
-          <p>
-            Las sesiones se validan en el servidor y los códigos OTP expiran. El
-            historial de intentos de autenticación todavía no forma parte de esta fase.
-          </p>
-          <span className="audit-status">Entrega OTP por correo: configurar SMTP</span>
-        </section>
-      )
-      : children
+    : children
 
   return (
     <div className="dashboard-shell">
@@ -170,9 +220,10 @@ function GlassyDashboard({
         activeTab={activeTab}
         completedRequests={completedRequests}
         onTabChange={onTabChange}
+        onTabIntent={onTabIntent}
         openRequests={openRequests}
         requestProgress={requestProgress}
-        totalRequests={requests.length}
+        totalRequests={totalRequests}
         user={user}
       />
 
@@ -184,6 +235,8 @@ function GlassyDashboard({
           onSelectSearchResult={onSelectSearchResult}
           searchQuery={searchQuery}
           searchResults={searchResults}
+          searchStatus={requestSearchStatus}
+          searchError={requestSearchError}
           user={user}
         />
         <div className="dashboard-content">
@@ -241,7 +294,8 @@ function GlassyDashboard({
               </button>
             </div>
           )}
-          {(hasLoadedData || dataStatus === 'ready') && (
+          {(hasLoadedData || dataStatus === 'ready' ||
+            (dashboardRole === 'SUPER_ADMIN' && subscription)) && (
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 animate={{ opacity: 1, y: 0 }}
@@ -251,7 +305,9 @@ function GlassyDashboard({
                 key={activeTab}
                 transition={{ duration: prefersReducedMotion ? 0 : 0.25 }}
               >
-                {pageContent}
+                <Suspense fallback={<div className="data-state" role="status">Cargando sección…</div>}>
+                  {pageContent}
+                </Suspense>
               </motion.div>
             </AnimatePresence>
           )}

@@ -61,6 +61,12 @@ describe('API de datos, migración y reportes', () => {
         priority: 'normal',
       },
     })
+    const approval = await api.send(`/api/requests/${request.payload.request.id}/approval`, {
+      method: 'PATCH',
+      cookie: api.superAdminSession.cookie,
+      body: { approvalStatus: 'aprobada' },
+    })
+    expect(approval.response.status).toBe(200)
     const completed = await api.send(`/api/requests/${request.payload.request.id}`, {
       method: 'PATCH',
       cookie: api.superAdminSession.cookie,
@@ -74,6 +80,8 @@ describe('API de datos, migración y reportes', () => {
     })
     expect(report.response.status).toBe(200)
     expect(report.payload.completedRequests.some((item) => item.id === request.payload.request.id)).toBe(true)
+    expect(report.payload.completedRequests.find((item) => item.id === request.payload.request.id))
+      .toMatchObject({ branchName: 'Principal', approvalStatus: 'aprobada' })
     expect(report.payload.lowStockProducts.some((item) => item.id === product.payload.product.id)).toBe(true)
 
     const employee = await api.send('/api/users', {

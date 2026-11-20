@@ -23,3 +23,23 @@ export function logout() {
 export function changePassword(passwords) {
   return apiRequest('/auth/change-password', { method: 'POST', body: passwords })
 }
+
+export function requestPasswordReset(email) {
+  return apiRequest('/auth/password-reset/request', { method: 'POST', body: { email } })
+}
+
+export function validatePasswordReset(token) {
+  return apiRequest('/auth/password-reset/validate', { method: 'POST', body: { token } })
+}
+
+export function completePasswordReset(reset) {
+  return apiRequest('/auth/password-reset/complete', { method: 'POST', body: reset })
+}
+
+export function previewInvitation(token) {
+  return apiRequest('/auth/invitations/preview', { method: 'POST', body: { token } })
+}
+
+export function acceptInvitation(invitation) {
+  return apiRequest('/auth/invitations/accept', { method: 'POST', body: invitation })
+}

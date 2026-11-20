@@ -590,6 +590,141 @@
   white-space: nowrap;
 }
 
+.plan-overview-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 18px;
+  border-radius: 16px;
+}
+
+.plan-overview-card-warning {
+  border-color: rgb(255 193 92 / 24%);
+  background: linear-gradient(110deg, rgb(255 193 92 / 7%), rgb(255 255 255 / 3%));
+}
+
+.plan-overview-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 11%);
+  border-radius: 11px;
+  color: #8be0b8;
+}
+
+.plan-overview-card-warning .plan-overview-icon {
+  border-color: rgb(255 193 92 / 18%);
+  color: #ffd58a;
+}
+
+.plan-overview-copy {
+  min-width: 0;
+}
+
+.plan-overview-heading,
+.plan-usage-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.plan-overview-heading h3 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.plan-overview-status {
+  padding: 5px 8px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 999px;
+  color: rgb(255 255 255 / 63%);
+  font-size: 9px;
+  text-transform: capitalize;
+}
+
+.plan-overview-copy > p {
+  margin: 7px 0 13px;
+  color: rgb(255 255 255 / 62%);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.plan-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.plan-usage-item {
+  min-width: 0;
+}
+
+.plan-usage-label {
+  margin-bottom: 6px;
+  color: rgb(255 255 255 / 55%);
+  font-size: 9px;
+}
+
+.plan-usage-label strong {
+  color: #f8fafc;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.plan-usage-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 9%);
+}
+
+.plan-usage-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff8062, #ffc17a);
+}
+
+.plan-usage-item small {
+  display: block;
+  margin-top: 5px;
+  color: rgb(255 255 255 / 45%);
+  font-size: 9px;
+}
+
+.plan-overview-button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid rgb(255 255 255 / 13%);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 5%);
+  color: #f8fafc;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.plan-overview-button:hover {
+  border-color: rgb(255 255 255 / 25%);
+  background: rgb(255 255 255 / 9%);
+}
+
+.plan-overview-button:focus-visible {
+  outline: 2px solid #ff9a79;
+  outline-offset: 3px;
+}
+
 .bento-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -727,6 +862,59 @@
   color: #f6c875;
   font-size: 9px;
   font-weight: 650;
+}
+
+.overview-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.overview-quick-action {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 5%);
+  color: rgb(255 255 255 / 82%);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 620;
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.overview-quick-action:hover {
+  transform: translateY(-1px);
+  border-color: rgb(255 137 106 / 42%);
+  background: rgb(255 107 74 / 10%);
+}
+
+.overview-quick-action > svg {
+  flex-shrink: 0;
+  color: #ff967e;
+}
+
+.overview-quick-action > strong {
+  display: grid;
+  min-width: 23px;
+  height: 23px;
+  place-items: center;
+  margin-left: 2px;
+  border-radius: 999px;
+  background: rgb(255 107 74 / 16%);
+  color: #ffad99;
+  font-size: 11px;
+}
+
+.overview-quick-action:focus-visible {
+  outline: 3px solid #ff9a80;
+  outline-offset: 3px;
 }
 
 @media (max-width: 1100px) {
@@ -878,8 +1066,32 @@
     gap: 10px;
   }
 
+  .overview-quick-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .overview-quick-action {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .bento-grid {
     grid-template-columns: 1fr;
+  }
+
+  .plan-overview-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .plan-overview-card > .plan-overview-button {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .plan-usage-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .glass-card {

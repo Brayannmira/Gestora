@@ -36,6 +36,10 @@ export function serializeUser(user) {
       SUPER_ADMIN: 'Superadministrador',
     }[user.role],
     roleKey,
+    organizationId: user.organization_id,
+    organizationName: user.organization_name,
+    branchId: user.branch_id,
+    branchName: user.branch_name,
     mustChangePassword: Boolean(user.must_change_password),
   }
 }
@@ -46,6 +50,9 @@ export function serializeProduct(product) {
     name: product.name,
     stock: product.stock,
     minimumStock: product.minimum_stock,
+    barcode: product.barcode ?? null,
+    branchId: product.branch_id,
+    branchName: product.branch_name,
   }
 }
 
@@ -56,8 +63,11 @@ export function serializeRequest(request) {
     description: request.description,
     priority: request.priority,
     status: request.status,
+    approvalStatus: request.approval_status,
     productId: request.product_id,
     productName: request.product_name,
+    branchId: request.branch_id,
+    branchName: request.branch_name,
     quantity: request.quantity,
     stockDeducted: Boolean(request.stock_deducted),
     createdAt: new Intl.DateTimeFormat('es-ES', {
@@ -82,6 +92,7 @@ export function serializeMovement(movement) {
     reason: movement.reason,
     requestId: movement.request_id,
     actorName: movement.actor_name,
+    branchName: movement.branch_name,
     createdAt: movement.created_at,
   }
 }
@@ -125,6 +136,24 @@ export function requireAuth(request, response, next) {
 
   request.user = session
   const routePath = request.originalUrl.split('?')[0]
+  const allowedDuringClosure = [
+    request.method === 'GET' &&
+      ['/api/auth/me', '/api/organizations/export', '/api/organizations/subscription'].includes(routePath),
+    request.method === 'POST' && ['/api/auth/logout', '/api/organizations/cancel-closure'].includes(routePath),
+  ].some(Boolean)
+  const trialExpired = session.subscription_status === 'trial' &&
+    Date.parse(session.trial_ends_at) <= Date.now()
+  if (
+    !allowedDuringClosure &&
+    (
+      session.organization_status !== 'active' ||
+      ['expired', 'suspended'].includes(session.subscription_status) ||
+      trialExpired
+    )
+  ) {
+    return next(new HttpError(403, 'El acceso de esta empresa está suspendido o venció su prueba.'))
+  }
+
   const allowedDuringPasswordChange =
     (request.method === 'GET' && routePath === '/api/auth/me') ||
     (request.method === 'POST' && ['/api/auth/change-password', '/api/auth/logout'].includes(routePath))

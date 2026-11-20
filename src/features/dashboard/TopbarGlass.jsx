@@ -15,6 +15,8 @@ function TopbarGlass({
   searchQuery,
   onSearchChange,
   searchResults,
+  searchStatus,
+  searchError,
   onSelectSearchResult,
 }) {
   const [searchOpen, setSearchOpen] = useState(false)
@@ -40,7 +42,7 @@ function TopbarGlass({
         <p className="topbar-eyebrow">GESTORA · ESPACIO DE TRABAJO</p>
         <h1>Bienvenido, {user.name}</h1>
         <span>
-          Perfil: {user.role} · datos guardados en la base de datos del equipo.
+          Empresa: {user.organizationName} · perfil: {user.role}.
         </span>
       </div>
 
@@ -110,6 +112,12 @@ function TopbarGlass({
                   )
                 })}
               </ul>
+            ) : searchStatus === 'loading' ? (
+              <p className="search-empty" role="status">Buscando…</p>
+            ) : searchStatus === 'error' ? (
+              <p className="search-empty" role="alert">
+                No se pudieron cargar los resultados: {searchError}
+              </p>
             ) : (
               <p className="search-empty" role="status">
                 No se encontraron coincidencias.

@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import { randomUUID } from 'node:crypto'
-import { db } from './database.js'
+import { db, defaultOrganizationId } from './database.js'
 import { hashPassword } from './security.js'
 
 const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase()
@@ -15,13 +15,23 @@ if (!email || !name || !password || password.length < 12) {
 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
   throw new Error('BOOTSTRAP_ADMIN_EMAIL debe ser un correo válido.')
 }
-if (db.prepare("SELECT 1 FROM users WHERE role = 'SUPER_ADMIN'").get()) {
+if (db.prepare(
+  "SELECT 1 FROM users WHERE role = 'SUPER_ADMIN' AND organization_id = ?",
+).get(defaultOrganizationId)) {
   throw new Error('Ya existe un superadministrador; no se puede crear otro.')
 }
 
 db.prepare(`
-  INSERT INTO users (id, email, name, password_hash, role, created_at)
-  VALUES (?, ?, ?, ?, 'SUPER_ADMIN', ?)
-`).run(randomUUID(), email, name, await hashPassword(password), new Date().toISOString())
+  INSERT INTO users
+    (id, email, name, password_hash, role, organization_id, created_at)
+  VALUES (?, ?, ?, ?, 'SUPER_ADMIN', ?, ?)
+`).run(
+  randomUUID(),
+  email,
+  name,
+  await hashPassword(password),
+  defaultOrganizationId,
+  new Date().toISOString(),
+)
 
 process.stderr.write(`Superadministrador creado para ${email}.\n`)

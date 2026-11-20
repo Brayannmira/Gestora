@@ -13,11 +13,19 @@ const router = express.Router()
 router.post('/', requireAuth, requireManager, (request, response, next) => {
   try {
     const name = requireText(request.body?.name, 'El nombre', 100)
+    const barcode = request.body?.barcode === undefined || request.body?.barcode === ''
+      ? null
+      : requireText(request.body.barcode, 'El código', 128)
+    const branchId = request.body?.branchId === undefined
+      ? undefined
+      : requireText(request.body.branchId, 'La sucursal', 64)
     const product = productsService.createProduct({
       name,
       stock: request.body?.stock,
       minimumStock: request.body?.minimumStock,
-      actorId: request.user.id,
+      barcode,
+      branchId,
+      actor: request.user,
     })
     response.status(201).json({ product: serializeProduct(product) })
   } catch (error) {
@@ -33,7 +41,7 @@ router.post('/:productId/movements', requireAuth, requireManager, (request, resp
       type: request.body?.type,
       quantity: request.body?.quantity,
       reason,
-      actorId: request.user.id,
+      actor: request.user,
     })
     response.status(201).json({
       product: serializeProduct(result.product),
@@ -46,7 +54,7 @@ router.post('/:productId/movements', requireAuth, requireManager, (request, resp
 
 router.delete('/:productId', requireAuth, requireManager, (request, response, next) => {
   try {
-    productsService.deleteProduct(request.params.productId)
+    productsService.deleteProduct(request.params.productId, request.user)
     response.status(204).end()
   } catch (error) {
     next(error)

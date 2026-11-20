@@ -20,6 +20,8 @@ function downloadCsv(report) {
     'Fecha',
     'Título',
     'Producto',
+    'Sucursal',
+    'Aprobación',
     'Cantidad',
     'Tipo',
     'Stock anterior',
@@ -34,6 +36,8 @@ function downloadCsv(report) {
       item.completedAt,
       item.title,
       item.productName,
+      item.branchName,
+      item.approvalStatus,
       item.quantity,
       '',
       '',
@@ -46,6 +50,8 @@ function downloadCsv(report) {
       item.createdAt,
       '',
       item.productName,
+      item.branchName,
+      '',
       item.quantity,
       item.type,
       item.previousStock,
@@ -58,6 +64,8 @@ function downloadCsv(report) {
       '',
       '',
       item.name,
+      item.branchName,
+      '',
       '',
       '',
       '',
@@ -173,7 +181,7 @@ function ReportsPage() {
                   {report.completedRequests.map((item) => (
                     <li key={item.id}>
                       <strong>{item.title}</strong>
-                      <span>{item.productName} · {item.quantity} unidades · {item.requesterName}</span>
+                      <span>{item.productName} · {item.quantity} unidades · {item.requesterName} · {item.branchName} · Aprobada</span>
                       <time dateTime={item.completedAt}>{new Date(item.completedAt).toLocaleString()}</time>
                     </li>
                   ))}
@@ -189,7 +197,7 @@ function ReportsPage() {
                   {report.movements.map((item) => (
                     <li key={item.id}>
                       <strong>{item.productName} · {item.type} ({item.delta > 0 ? '+' : ''}{item.delta})</strong>
-                      <span>{item.previousStock} → {item.newStock} unidades · {item.actorName} · {item.reason}</span>
+                      <span>{item.previousStock} → {item.newStock} unidades · {item.actorName} · {item.branchName} · {item.reason}</span>
                       <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time>
                     </li>
                   ))}
@@ -205,7 +213,7 @@ function ReportsPage() {
                   {report.lowStockProducts.map((item) => (
                     <li key={item.id}>
                       <strong>{item.name}</strong>
-                      <span>{item.stock} unidades disponibles · mínimo {item.minimumStock}</span>
+                      <span>{item.stock} unidades disponibles · mínimo {item.minimumStock} · {item.branchName}</span>
                     </li>
                   ))}
                 </ul>

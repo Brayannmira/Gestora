@@ -4,6 +4,7 @@ function SidebarGlass({
   user,
   activeTab,
   onTabChange,
+  onTabIntent,
   openRequests,
   completedRequests,
   totalRequests,
@@ -31,6 +32,8 @@ function SidebarGlass({
                 className={`sidebar-link${activeTab === item.id ? ' active' : ''}`}
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
+                onFocus={() => onTabIntent(item.id)}
+                onPointerEnter={() => onTabIntent(item.id)}
                 type="button"
               >
                 <span className="sidebar-link-label">
@@ -73,6 +76,7 @@ function SidebarGlass({
         <div className="profile-copy">
           <span className="profile-name">{user.name}</span>
           <span className="profile-role">{user.role}</span>
+          {user.branchName && <span className="profile-role">{user.branchName}</span>}
         </div>
       </div>
     </aside>

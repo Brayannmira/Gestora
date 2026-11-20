@@ -14,3 +14,11 @@ export function createMovement(productId, movement) {
     body: movement,
   })
 }
+
+export function getBranches() {
+  return apiRequest('/branches')
+}
+
+export function createBranch(name) {
+  return apiRequest('/branches', { method: 'POST', body: { name } })
+}

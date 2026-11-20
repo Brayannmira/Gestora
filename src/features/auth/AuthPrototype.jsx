@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { login, resendOtp, verifyOtp } from './authApi.js'
+import { login, resendOtp, requestPasswordReset, verifyOtp } from './authApi.js'
 import '../../AuthPrototype.css'
 
 const OTP_LENGTH = 6
@@ -11,7 +11,7 @@ function maskEmail(value) {
   return `${visiblePart}${'•'.repeat(Math.max(3, localPart.length - visiblePart.length))}@${domain}`
 }
 
-function AuthPrototype({ onAuthenticated, serverError }) {
+function AuthPrototype({ onAuthenticated, onPrepareDashboard, serverError }) {
   const [step, setStep] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -54,8 +54,26 @@ function AuthPrototype({ onAuthenticated, serverError }) {
       setCode(Array(OTP_LENGTH).fill(''))
       setResendSeconds(result.resendIn)
       setStep('otp')
+      onPrepareDashboard().catch(() => {
+        setError('El código se envió, pero el panel no se pudo precargar. Continuará cargando después de verificarlo.')
+      })
     } catch (loginError) {
       setError(loginError.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+
+  }
+
+  async function handlePasswordRecovery(event) {
+    event.preventDefault()
+    setError('')
+    setIsSubmitting(true)
+    try {
+      await requestPasswordReset(email.trim())
+      setStep('recovery-sent')
+    } catch (recoveryError) {
+      setError(recoveryError.message)
     } finally {
       setIsSubmitting(false)
     }
@@ -220,6 +238,54 @@ function AuthPrototype({ onAuthenticated, serverError }) {
               <p className="auth-demo-note">
                 El código OTP se envía por correo cuando SMTP está configurado.
               </p>
+              <button
+                className="text-button"
+                onClick={() => {
+                  setError('')
+                  setStep('recovery')
+                }}
+                type="button"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          )}
+
+          {step === 'recovery' && (
+            <div className="auth-form-view">
+              <button className="back-button" onClick={() => setStep('login')} type="button">
+                <span aria-hidden="true">←</span> Volver
+              </button>
+              <span className="auth-kicker">RECUPERACIÓN DE CUENTA</span>
+              <h2>Restablece tu contraseña</h2>
+              <p className="auth-intro">Si el correo está asociado a una cuenta activa, enviaremos un enlace.</p>
+              <form className="auth-form" onSubmit={handlePasswordRecovery}>
+                <label htmlFor="recovery-email">Correo electrónico</label>
+                <input
+                  autoComplete="email"
+                  id="recovery-email"
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  type="email"
+                  value={email}
+                />
+                <button className="auth-primary-button" disabled={isSubmitting} type="submit">
+                  {isSubmitting ? 'Enviando…' : 'Enviar instrucciones'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {step === 'recovery-sent' && (
+            <div className="auth-form-view">
+              <span className="auth-kicker">REVISA TU CORREO</span>
+              <h2>Solicitud recibida</h2>
+              <p className="auth-intro">
+                Si el correo está asociado a una cuenta activa, recibirás instrucciones para recuperar el acceso.
+              </p>
+              <button className="text-button" onClick={() => setStep('login')} type="button">
+                Volver a iniciar sesión
+              </button>
             </div>
           )}
 

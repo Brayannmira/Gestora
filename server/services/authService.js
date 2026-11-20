@@ -10,6 +10,8 @@ export function createAuthService({
   transaction,
   security,
   sendOtp,
+  sendPasswordReset,
+  audit,
   nowMs = () => Date.now(),
   now = () => new Date().toISOString(),
   createId = randomUUID,
@@ -18,6 +20,9 @@ export function createAuthService({
     const user = repository.findActiveUserByEmail(email)
     if (!(await security.verifyPassword(password, user?.password_hash))) {
       throw new HttpError(401, 'Correo o contraseña incorrectos.')
+    }
+    if (!['active', 'closing'].includes(user.organization_status)) {
+      throw new HttpError(403, 'El acceso de esta empresa está suspendido.')
     }
 
     const id = createId()
@@ -39,7 +44,9 @@ export function createAuthService({
       await sendOtp(user.email, code)
     } catch (error) {
       repository.deleteOtpChallenge(id)
-      throw new HttpError(503, error.message)
+      process.stderr.write('[Gestora] No se pudo enviar un código OTP.\n')
+      if (!(error instanceof Error)) throw error
+      throw new HttpError(503, 'No se pudo enviar el código de acceso. Inténtalo más tarde.')
     }
 
     return {
@@ -71,7 +78,9 @@ export function createAuthService({
     try {
       await sendOtp(challenge.email, code)
     } catch (error) {
-      throw new HttpError(503, error.message)
+      process.stderr.write('[Gestora] No se pudo reenviar un código OTP.\n')
+      if (!(error instanceof Error)) throw error
+      throw new HttpError(503, 'No se pudo reenviar el código de acceso. Inténtalo más tarde.')
     }
 
     return { expiresIn: otpLifetimeMs / 1000, resendIn: otpResendDelayMs / 1000 }
@@ -140,5 +149,94 @@ export function createAuthService({
     repository.deleteSession(tokenHash)
   }
 
-  return { login, resendOtp, verifyOtp, changePassword, logout }
+  async function requestPasswordReset(email) {
+    const user = repository.findActiveUserByEmail(email)
+    if (!user || user.organization_status !== 'active') return
+
+    const token = security.createSessionToken()
+    const tokenHash = security.hashSessionToken(token)
+    const id = createId()
+    const currentTime = nowMs()
+    transaction(() => {
+      repository.deletePasswordResetTokensByUser(user.id)
+      repository.createPasswordResetToken({
+        id,
+        userId: user.id,
+        tokenHash,
+        expiresAt: new Date(currentTime + 30 * 60 * 1000).toISOString(),
+        createdAt: now(),
+      })
+    })
+    try {
+      await sendPasswordReset(user.email, token)
+    } catch {
+      repository.deletePasswordResetTokensByUser(user.id)
+      process.stderr.write('[Gestora] No se pudo enviar un correo de recuperación.\n')
+    }
+  }
+
+  function isPasswordResetTokenValid(token) {
+    if (!token) return false
+    const reset = repository.findPasswordResetToken(security.hashSessionToken(token))
+    return Boolean(
+      reset &&
+      reset.is_active &&
+      reset.organization_status === 'active' &&
+      Date.parse(reset.expires_at) > nowMs(),
+    )
+  }
+
+  async function completePasswordReset({ token, newPassword }) {
+    if (newPassword.length < 12) {
+      throw new HttpError(400, 'La contraseña debe tener al menos 12 caracteres.')
+    }
+    const passwordHash = await security.hashPassword(newPassword)
+    const tokenHash = security.hashSessionToken(token)
+    transaction(() => {
+      const reset = repository.findPasswordResetToken(tokenHash)
+      if (
+        !reset ||
+        !reset.is_active ||
+        reset.organization_status !== 'active' ||
+        Date.parse(reset.expires_at) <= nowMs()
+      ) {
+        throw new HttpError(400, 'El enlace de recuperación es inválido o venció.')
+      }
+      const consumed = repository.consumePasswordResetToken(
+        reset.id,
+        tokenHash,
+        now(),
+      )
+      if (consumed.changes !== 1) {
+        throw new HttpError(400, 'El enlace de recuperación es inválido o venció.')
+      }
+      const update = repository.updatePasswordFromReset(reset.user_id, passwordHash)
+      if (update.changes !== 1) {
+        throw new HttpError(400, 'No se pudo restablecer la contraseña de esta cuenta.')
+      }
+      repository.deleteSessionsByUser(reset.user_id)
+      repository.deleteOtpChallengesByUser(reset.user_id)
+      audit.record({
+        actor: {
+          id: reset.user_id,
+          name: reset.name,
+          organization_id: reset.organization_id,
+        },
+        action: 'user.password_recovered',
+        entityType: 'user',
+        entityId: reset.user_id,
+      })
+    })
+  }
+
+  return {
+    login,
+    resendOtp,
+    verifyOtp,
+    changePassword,
+    requestPasswordReset,
+    isPasswordResetTokenValid,
+    completePasswordReset,
+    logout,
+  }
 }

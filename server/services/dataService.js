@@ -11,13 +11,24 @@ function parseDate(value) {
 export function createDataService({ repository, now = () => new Date() }) {
   function getData(user) {
     return {
-      products: repository.findProducts(),
-      requests: repository.findRequests(user.role === 'EMPLOYEE' ? user.id : null),
-      movements: user.role === 'EMPLOYEE' ? [] : repository.findMovements(),
+      products: repository.findProducts(
+        user.organization_id,
+        user.role === 'EMPLOYEE' ? user.branch_id : undefined,
+      ),
+      branches: repository.findBranches(
+        user.organization_id,
+        user.role === 'EMPLOYEE' ? user.branch_id : undefined,
+      ),
+      requestSummary: repository.getRequestSummary(
+        user.organization_id,
+        user.role === 'EMPLOYEE' ? user.id : null,
+        user.role === 'EMPLOYEE' ? user.branch_id : undefined,
+      ),
+      movements: user.role === 'EMPLOYEE' ? [] : repository.findMovements(user.organization_id),
     }
   }
 
-  function getReports({ from, to } = {}) {
+  function getReports({ from, to } = {}, organizationId) {
     const endDate = now()
     const startDate = new Date(endDate)
     startDate.setUTCDate(startDate.getUTCDate() - 29)
@@ -39,10 +50,10 @@ export function createDataService({ repository, now = () => new Date() }) {
     return {
       from: fromDateString,
       to: toDateStringValue,
-      completedRequests: repository.findCompletedRequests(start, endExclusive),
-      lowStockProducts: repository.findLowStockProducts(),
-      movements: repository.findMovementsBetween(start, endExclusive),
-      movementTotals: repository.getMovementTotals(start, endExclusive),
+      completedRequests: repository.findCompletedRequests(organizationId, start, endExclusive),
+      lowStockProducts: repository.findLowStockProducts(organizationId),
+      movements: repository.findMovementsBetween(organizationId, start, endExclusive),
+      movementTotals: repository.getMovementTotals(organizationId, start, endExclusive),
     }
   }
 
